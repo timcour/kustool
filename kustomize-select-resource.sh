@@ -74,6 +74,7 @@ function doc_count {
     yq e '. | kind' | wc -l
 }
 
+
 OUT=$(build "${KUST_DIR}" | select_document "$YQ_SELECT")
 
 if [[ $DOC_COUNT -eq 1 ]]; then
