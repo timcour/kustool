@@ -28,6 +28,11 @@ while [[ $# -gt 0 ]]; do
       DOC_COUNT=1
       shift # past argument
       ;;
+    -s|--yq-select)
+      YQ_SELECT=$2
+      shift
+      shift
+      ;;
     -h|--HELP)
       HELP="$2"
       help
@@ -47,7 +52,6 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 KUST_FILE=$1
-YQ_SELECT=${2:-.}
 
 KUST_DIR=$(dirname "${KUST_FILE}")
 
