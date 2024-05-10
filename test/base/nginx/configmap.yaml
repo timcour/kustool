@@ -1,0 +1,9 @@
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-env-config
+  namespace: default
+data:
+  NGINX_PORT: "8080"
+  NGINX_SERVER_NAME: "example.com"

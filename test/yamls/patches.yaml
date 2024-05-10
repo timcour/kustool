@@ -1,0 +1,6 @@
+- op: add
+  path: /spec/template/spec/containers/0/args/5
+  value: the-fifth-arg
+- op: add
+  path: /foo
+  value: bar

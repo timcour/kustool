@@ -1,0 +1,7 @@
+- target:
+    kind: Deployment
+    name: foobar
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/args/5
+      value: foobar
