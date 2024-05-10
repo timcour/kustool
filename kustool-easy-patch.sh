@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -w|--write)
-      WRITE_KUSTOMIZATION_UPDATE=$2
+      WRITE_KUSTOMIZATION_UPDATE=1
       shift
       shift
       ;;
