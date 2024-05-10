@@ -86,8 +86,7 @@ if [[ ! -z "${NAME}" ]]; then
     QUERY_PARTS="$QUERY_PARTS .target.name==\"${NAME}\""
 fi
 # yq '.patches[] | select(.target.kind== "Deployment")'
-PATCHES_SELECT=$(join_by ' and ' $QUERY_PARTS)
-
+export PATCHES_SELECT=$(join_by ' and ' $QUERY_PARTS)
 
 function build {
     DIR_PATH=$1
@@ -124,7 +123,7 @@ fi
 # Build and write current fully _patched_ yaml to EDIT_FILE
 "${SCRIPT_DIR}"/kustomize-select-resource.sh "${KUST_FILE}" -s "${RESOURCE_SELECT}" > ${EDIT_FILE}
 
-# remove patches, build and write _unpatched_ yaml to UNPATCHED_BUILD_FILE
+# Remove patches, build and write _unpatched_ yaml to UNPATCHED_BUILD_FILE
 push_unpatched_kustomize "${KUST_FILE}.bak"
 "${SCRIPT_DIR}"/kustomize-select-resource.sh "${KUST_FILE}" -s "${RESOURCE_SELECT}" > ${UNPATCHED_BUILD_FILE}
 pop_unpatched_kustomize "${KUST_FILE}.bak"
@@ -142,10 +141,83 @@ if ! cat ${EDIT_FILE} | yq; then
 fi
 
 # get the diff with jd
-PATCHES=$(jd -f patch -yaml ${UNPATCHED_BUILD_FILE} ${EDIT_FILE} | yq -P)
+export PATCHES="$(jd -f patch -yaml ${UNPATCHED_BUILD_FILE} ${EDIT_FILE} | yq -P -o yaml)"
 
 #TODO: only echo of -p specified
 echo "patches:"
 echo "${PATCHES}"
 
 #TODO: insert (or replace) the single patch matching PATCHES_SELECT _using_ the .kind/.metadata.name from the yaml resource.
+
+# Filter out target element
+#yq '.patches | filter(.target.kind != "Deployment" or .target.name != "external-dns-whisman-fulfil-ai")
+
+QUERY_PARTS=""
+if [[ ! -z "${KIND}" ]]; then
+    QUERY_PARTS="$QUERY_PARTS .target.kind!=\"${KIND}\""
+fi
+if [[ ! -z "${NAME}" ]]; then
+    QUERY_PARTS="$QUERY_PARTS .target.name!=\"${NAME}\""
+fi
+# yq '.patches[] | select(.target.kind== "Deployment")'
+export NOMUTATE_SELECT="$(join_by ' or ' $QUERY_PARTS)"
+echo "NOMUTATE_SELECT: $NOMUTATE_SELECT"
+
+##### How do i grab the array elements, not the damn string!?
+
+# Filter all non-targeted resources out
+echo "PATCHES_SELECT"
+echo "$PATCHES_SELECT"
+
+CURRENT_PATCH_TARGET=$(cat "${KUST_FILE}" | yq  '.patches | filter(eval(strenv(PATCHES_SELECT)))')
+echo "CURRENT_PATCH_TARGET"
+echo "${CURRENT_PATCH_TARGET}"
+
+#TODO: factor out yq queries for readability, e.g.
+# function replace_patches {
+#      yq -o json '.[0].patch = strenv(PATCHES)'
+# }
+
+echo "generating new patch"
+export NEW_PATCH_TARGET=$(echo "${CURRENT_PATCH_TARGET}" | yq  '.[0].patch |= strenv(PATCHES)')
+echo -e --- NEW_PATCH_TARGET
+echo "${NEW_PATCH_TARGET}"
+
+
+QUERY_PARTS=""
+if [[ ! -z "${KIND}" ]]; then
+    QUERY_PARTS="\"kind\":\"${KIND}\""
+fi
+if [[ ! -z "${NAME}" ]]; then
+    QUERY_PARTS="$QUERY_PARTS \"name\":\"${NAME}\""
+fi
+# yq '.patches[] | select(.target.kind== "Deployment")'
+export PATCH_SELECTOR=$(join_by ' and ' $QUERY_PARTS)
+
+echo "PATCH_SELECTOR"
+echo "$PATCH_SELECTOR"
+
+function replace_patch_target {
+    export SELECT="${1}"
+    export PATCH_TARGET="${2}"
+    # echo "SELECT: $SELECT"
+    # echo "PATCH_TARGET: $PATCH_TARGET"
+    yq '.patches |= filter(eval(strenv(SELECT))) += strenv(PATCH_TARGET)'
+}
+
+# Remove the single patch target from the original, and append the new
+echo "without function"
+cat "${KUST_FILE}" | yq '.patches |= filter(eval(strenv(NOMUTATE_SELECT))) *+ env(NEW_PATCH_TARGET)'
+echo "without function"
+
+# echo "with the function"
+# cat "${KUST_FILE}" | replace_patch_target "${NOMUTATE_SELECT}" "${NEW_PATCH_TARGET}"
+
+
+
+
+
+# Append to array
+#cat ${KUST_FILE} | yq e '.patches += eval(strenv(PATCHES))'
+
+# ORIG_FILE=$(mktemp)
