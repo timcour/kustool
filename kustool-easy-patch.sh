@@ -206,7 +206,7 @@ debug "Filter select query for other patch targets: $NOMUTATE_SELECT"
 
 
 CURRENT_PATCH_TARGET=$(cat "${KUST_FILE}" | yq  '.patches | filter(eval(strenv(PATCHES_SELECT)))')
-debug "CURRENT_PATCH_TARGET\n"${CURRENT_PATCH_TARGET}""
+debug "CURRENT_PATCH_TARGET\n${CURRENT_PATCH_TARGET}"
 
 export NEW_PATCH_TARGET=$(echo "${CURRENT_PATCH_TARGET}" | yq  '.[0].patch |= strenv(PATCHES)')
 debug "The patched patch target"
