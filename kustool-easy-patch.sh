@@ -61,7 +61,7 @@ while [[ $# -gt 0 ]]; do
       DEBUG=1
       shift
       ;;
-    -h|--HELP)
+    -h|--help)
       HELP="$2"
       help
       exit 0
@@ -94,6 +94,10 @@ if [ -z ${KUST_FILE} ]; then
     help "Path to kustomization.yaml not specified"
     exit 1
 fi
+
+function rm_whitespace {
+    sed 's/ *$//'
+}
 
 function join_by {
   local d=${1-} f=${2-}

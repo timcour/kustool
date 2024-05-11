@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - nginx
+patches:
+  - target:
+      name: nginx-deployment
+      kind: Deployment
+    patch: |-
+      - op: test
+        path: /spec/replicas
+        value: 1
+      - op: remove
+        path: /spec/replicas
+        value: 1
+      - op: add
+        path: /spec/replicas
+        value: 2
