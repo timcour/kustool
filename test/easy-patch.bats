@@ -2,6 +2,7 @@
 
 # Must have KUSTOOL_ROOT in env
 EASY_PATCH="${KUSTOOL_ROOT}/kustool-easy-patch.sh"
+KUSTOMIZE_BUILD="kustomize build --load-restrictor LoadRestrictionsNone"
 
 function pass {
     echo ""
@@ -40,14 +41,32 @@ function pass {
     skip "not yet tested"
 }
 
-@test "the -w option should update the specified kustomization.yaml" {
-    skip "not yet tested"
+# bats test_tags=only
+@test "the -w option should update the specified kustomization.yaml" { #@only
+    git checkout "${KUSTOOL_ROOT}/test/cluster-a/web/kustomization.yaml"
+
+    $EASY_PATCH -w \
+                --kind Deployment --name nginx-deployment \
+                --file-to-diff "${KUSTOOL_ROOT}/test/data/easy-patch-happy-path-edited.yaml" "${KUSTOOL_ROOT}/test/cluster-a/web/kustomization.yaml" --debug
+
+    diff ${KUSTOOL_ROOT}/test/data/easy-patch-happy-path-expected.yaml test/cluster-a/web/kustomization.yaml
+    status="$?"
+
+    git checkout "${KUSTOOL_ROOT}/test/cluster-a/web/kustomization.yaml"
+
+    [ "$status" ]
 }
 
+# bats test_tags=
 @test "the --debug option should print a bunch of messages to stderr" {
     skip "not yet tested"
 }
 
 @test "should always print the final (and only the final) kustomize.yaml to stdout" {
-    skip "not yet tested"
+    result=$($EASY_PATCH --kind Deployment --name nginx-deployment \
+                         --file-to-diff ${KUSTOOL_ROOT}/test/data/easy-patch-happy-path-edited.yaml \
+                         test/cluster-a/web/kustomization.yaml)
+
+    echo "${result}" | yq
+    [ "$?" ]
 }

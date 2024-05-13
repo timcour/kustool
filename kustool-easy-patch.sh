@@ -55,7 +55,6 @@ while [[ $# -gt 0 ]]; do
     -w|--write)
       WRITE_KUSTOMIZATION_UPDATE=1
       shift
-      shift
       ;;
     --debug)
       DEBUG=1
@@ -227,10 +226,12 @@ function replace_patch_target {
 # cat "${KUST_FILE}" | yq '.patches |= filter(eval(strenv(NOMUTATE_SELECT))) *+ env(NEW_PATCH_TARGET)'
 
 debug "Generating kustomization with updated patch target"
+debug "  would write to ${KUST_FILE}"
 NEW_KUSTOMIZATION=$(cat "${KUST_FILE}" | replace_patch_target "${NOMUTATE_SELECT}" "${NEW_PATCH_TARGET}")
 echo "${NEW_KUSTOMIZATION}"
 
+
 if [ ! -z ${WRITE_KUSTOMIZATION_UPDATE} ]; then
-    echo "${NEW_KUSTOMIZATION}" > ${KUST_FILE}
+    echo "${NEW_KUSTOMIZATION}" > "${KUST_FILE}"
     debug "Updated ${KUST_FILE}"
 fi

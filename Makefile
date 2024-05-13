@@ -11,3 +11,7 @@ endif
 .PHONY: test
 test: check-env
 	@bats $(TEST_DIR)/*.bats
+
+.PHONY: test-only
+test-only: check-env
+	@bats $(TEST_DIR)/*.bats --filter-tags only
