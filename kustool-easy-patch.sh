@@ -111,9 +111,19 @@ debug "NOMUTATE_SELECT:\n    ${NOMUTATE_SELECT}"
 
 KUST_FILE=$1
 
+function mktemp_yaml {
+    filename=$1
+    dir=$(mktemp -d)
+    path="$dir"/"$filename"
+    touch "$path"
+    echo "$path"
+}
+
 KUST_DIR=$(dirname "${KUST_FILE}")
-EDIT_FILE=$(mktemp)
-UNPATCHED_BUILD_FILE=$(mktemp)
+EDIT_FILE=$(mktemp_yaml "exit_file.yaml")
+UNPATCHED_BUILD_FILE=$(mktemp_yaml "unpatched_build_file.yaml")
+debug "UNPATCHED_BUILD_FILE: $UNPATCHED_BUILD_FILE"
+debug "EDIT_FILE: $EDIT_FILE"
 
 function rm_whitespace {
     sed 's/ *$//'
