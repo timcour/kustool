@@ -40,15 +40,24 @@ function debug {
     >&2 echo -e "DEBUG: $@"
 }
 
+RESOURCE_PARTS=""
+PATCHES_PARTS=""
+NONTARGET_PARTS=""
 while [[ $# -gt 0 ]]; do
   case $1 in
     -k|--kind)
       KIND=$2
+      RESOURCE_PARTS="$RESOURCE_PARTS .kind==\"${KIND}\""
+      PATCHES_PARTS="$PATCHES_PARTS .target.kind==\"${KIND}\""
+      NONTARGET_PARTS="$NONTARGET_PARTS .target.name!=\"${KIND}\""
       shift
       shift
       ;;
     -n|--name)
       NAME=$2
+      RESOURCE_PARTS="$RESOURCE_PARTS .metadata.name==\"${NAME}\""
+      PATCHES_PARTS="$PATCHES_PARTS .target.name==\"${NAME}\""
+      NONTARGET_PARTS="$NONTARGET_PARTS .target.name!=\"${NAME}\""
       shift
       shift
       ;;
@@ -83,21 +92,6 @@ done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
-KUST_FILE=$1
-
-KUST_DIR=$(dirname "${KUST_FILE}")
-EDIT_FILE=$(mktemp)
-UNPATCHED_BUILD_FILE=$(mktemp)
-
-if [ -z ${KUST_FILE} ]; then
-    help "Path to kustomization.yaml not specified"
-    exit 1
-fi
-
-function rm_whitespace {
-    sed 's/ *$//'
-}
-
 function join_by {
   local d=${1-} f=${2-}
   if shift 2; then
@@ -105,26 +99,24 @@ function join_by {
   fi
 }
 
-QUERY_PARTS=""
-if [[ ! -z "${KIND}" ]]; then
-    QUERY_PARTS="$QUERY_PARTS .kind==\"${KIND}\""
-fi
-if [[ ! -z "${NAME}" ]]; then
-    QUERY_PARTS="$QUERY_PARTS .metadata.name==\"${NAME}\""
-fi
-RESOURCE_SELECT=$(join_by ' and ' $QUERY_PARTS)
-debug "RESOURCE_SELECT yq selection query"
-debug "${RESOURCE_SELECT}"
+#TODO: Associative arrays would be cleaner, but punting because issues
+export RESOURCE_SELECT=$(join_by ' and ' $RESOURCE_PARTS)
+export PATCHES_SELECT=$(join_by ' and ' $PATCHES_PARTS)
+export NOMUTATE_SELECT=$(join_by ' and ' $NONTARGET_PARTS)
 
-QUERY_PARTS=""
-if [[ ! -z "${KIND}" ]]; then
-    QUERY_PARTS="$QUERY_PARTS .target.kind==\"${KIND}\""
-fi
-if [[ ! -z "${NAME}" ]]; then
-    QUERY_PARTS="$QUERY_PARTS .target.name==\"${NAME}\""
-fi
-# yq '.patches[] | select(.target.kind== "Deployment")'
-export PATCHES_SELECT=$(join_by ' and ' $QUERY_PARTS)
+debug "RESOURCE_SELECT:\n    ${RESOURCE_SELECT}"
+debug "PATCHES_SELECT:\n    ${PATCHES_SELECT}"
+debug "NOMUTATE_SELECT:\n    ${NOMUTATE_SELECT}"
+
+KUST_FILE=$1
+
+KUST_DIR=$(dirname "${KUST_FILE}")
+EDIT_FILE=$(mktemp)
+UNPATCHED_BUILD_FILE=$(mktemp)
+
+function rm_whitespace {
+    sed 's/ *$//'
+}
 
 function build {
     DIR_PATH=$1
@@ -148,6 +140,35 @@ function pop_unpatched_kustomize {
     mv  "${BAKFILE}" "${KUST_FILE}"
 }
 
+function replace_patch_target {
+    export SELECT="${1}"
+    export PATCH_TARGET="${2}"
+    yq '.patches |= filter(eval(strenv(SELECT))) *+ env(PATCH_TARGET)'
+}
+
+function write_edit_file {
+    kust_file="${1}"
+    selector="${2}"
+    edit_file="${3}"
+    "${SCRIPT_DIR}"/kustool-filter-resource.sh "${kust_file}" -s "${selector}" > ${edit_file}
+}
+
+function write_unpatched_kustomize_file {
+    kust_file="${1}"
+    selector="${2}"
+    unpatched_kust_file="${3}"
+
+    push_unpatched_kustomize "${kust_file}.bak"
+    "${SCRIPT_DIR}"/kustool-filter-resource.sh "${kust_file}" -s "${selector}" > ${unpatched_kust_file}
+    pop_unpatched_kustomize "${kust_file}.bak"
+}
+
+### Validation
+if [ -z ${KUST_FILE} ]; then
+    help "Path to kustomization.yaml not specified"
+    exit 1
+fi
+
 debug "Filtering kustomize build resources: ${KUST_FILE}; select: ${RESOURCE_SELECT}"
 # only one document at a time supported
 RESOURCE_COUNT=$("${SCRIPT_DIR}"/kustool-filter-resource.sh -c "${KUST_FILE}" -s "${RESOURCE_SELECT}")
@@ -160,12 +181,8 @@ fi
 #TODO: also ensure _at most_ one patch matches
 
 # Build and write current fully _patched_ yaml to EDIT_FILE
-"${SCRIPT_DIR}"/kustool-filter-resource.sh "${KUST_FILE}" -s "${RESOURCE_SELECT}" > ${EDIT_FILE}
-
-# Remove patches, build and write _unpatched_ yaml to UNPATCHED_BUILD_FILE
-push_unpatched_kustomize "${KUST_FILE}.bak"
-"${SCRIPT_DIR}"/kustool-filter-resource.sh "${KUST_FILE}" -s "${RESOURCE_SELECT}" > ${UNPATCHED_BUILD_FILE}
-pop_unpatched_kustomize "${KUST_FILE}.bak"
+write_edit_file "${KUST_FILE}" "${RESOURCE_SELECT}" ${EDIT_FILE}
+write_unpatched_kustomize_file "${KUST_FILE}" "${RESOURCE_SELECT}" "${UNPATCHED_BUILD_FILE}"
 
 # edit EDIT_FILE
 # TODO: why does quoting the tempfile not work?
@@ -186,27 +203,12 @@ fi
 # get the diff with jd
 export PATCHES="$(jd -f patch -yaml ${UNPATCHED_BUILD_FILE} ${EDIT_FILE} | yq -P -o yaml)"
 
-#TODO: only echo of -p specified
 debug "Generated updated yamlfied JSON patch"
 debug "${PATCHES}"
 
 #TODO: insert (or replace) the single patch matching PATCHES_SELECT _using_ the .kind/.metadata.name from the yaml resource.
 
-# Filter out target element
-#yq '.patches | filter(.target.kind != "Deployment" or .target.name != "external-dns-whisman-fulfil-ai")
-
-QUERY_PARTS=""
-if [[ ! -z "${KIND}" ]]; then
-    QUERY_PARTS="$QUERY_PARTS .target.kind!=\"${KIND}\""
-fi
-if [[ ! -z "${NAME}" ]]; then
-    QUERY_PARTS="$QUERY_PARTS .target.name!=\"${NAME}\""
-fi
-# yq '.patches[] | select(.target.kind== "Deployment")'
-export NOMUTATE_SELECT="$(join_by ' or ' $QUERY_PARTS)"
-
 debug "Filter select query for other patch targets: $NOMUTATE_SELECT"
-
 
 CURRENT_PATCH_TARGET=$(cat "${KUST_FILE}" | yq  '.patches | filter(eval(strenv(PATCHES_SELECT)))')
 debug "CURRENT_PATCH_TARGET\n${CURRENT_PATCH_TARGET}"
@@ -214,12 +216,6 @@ debug "CURRENT_PATCH_TARGET\n${CURRENT_PATCH_TARGET}"
 export NEW_PATCH_TARGET=$(echo "${CURRENT_PATCH_TARGET}" | yq  '.[0].patch |= strenv(PATCHES)')
 debug "The patched patch target"
 debug "${NEW_PATCH_TARGET}"
-
-function replace_patch_target {
-    export SELECT="${1}"
-    export PATCH_TARGET="${2}"
-    yq '.patches |= filter(eval(strenv(SELECT))) *+ env(PATCH_TARGET)'
-}
 
 # # Remove the single patch target from the original, and append the new
 # debug "without function"
