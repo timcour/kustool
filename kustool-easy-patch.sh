@@ -120,6 +120,7 @@ function rm_whitespace {
 
 function build {
     DIR_PATH=$1
+
     kustomize build --load-restrictor LoadRestrictionsNone ${DIR_PATH}
 }
 
@@ -129,6 +130,7 @@ function delete_patches {
 
 function push_unpatched_kustomize {
     BAKFILE=${1:-"${KUST_FILE}.bak"}
+
     mv "${KUST_FILE}" "${BAKFILE}"
     debug "writing unpatched kustomization"
     debug $(cat "${BAKFILE}" | delete_patches)
@@ -137,12 +139,14 @@ function push_unpatched_kustomize {
 
 function pop_unpatched_kustomize {
     BAKFILE=${1:-"${KUST_FILE}.bak"}
+
     mv  "${BAKFILE}" "${KUST_FILE}"
 }
 
 function replace_patch_target {
     export SELECT="${1}"
     export PATCH_TARGET="${2}"
+
     yq '.patches |= filter(eval(strenv(SELECT))) *+ env(PATCH_TARGET)'
 }
 
@@ -150,6 +154,7 @@ function write_edit_file {
     kust_file="${1}"
     selector="${2}"
     edit_file="${3}"
+
     "${SCRIPT_DIR}"/kustool-filter-resource.sh "${kust_file}" -s "${selector}" > ${edit_file}
 }
 
