@@ -172,6 +172,11 @@ fi
 debug "Filtering kustomize build resources: ${KUST_FILE}; select: ${RESOURCE_SELECT}"
 # only one document at a time supported
 RESOURCE_COUNT=$("${SCRIPT_DIR}"/kustool-filter-resource.sh -c "${KUST_FILE}" -s "${RESOURCE_SELECT}")
+if [ "$?" -ne 0 ]; then
+    debug "RESOURCE_COUNT failed: ${RESOURCE_COUNT}"
+    exit 1
+fi
+
 if [[ ${RESOURCE_COUNT} -gt 1 ]]; then
     echo "Only one supported at this time.  Ensure --kind and --name are"
     echo " specified."

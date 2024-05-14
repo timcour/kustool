@@ -70,3 +70,11 @@ function pass {
     echo "${result}" | yq
     [ "$?" ]
 }
+
+@test "should fail with useful message when kustomize.yaml invalid" {
+    run $EASY_PATCH --kind ConfigMap --name nginx-config-map \
+                         --file-to-diff ${KUSTOOL_ROOT}/test/data/easy-patch-happy-path-edited.yaml \
+                         ${KUSTOOL_ROOT}/test/cluster-a/invalid-web/kustomization.yaml
+
+    [ "$status" -eq 1 ]
+}

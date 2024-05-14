@@ -62,7 +62,9 @@ fi
 
 function build {
     DIR_PATH=$1
-    kustomize build --load-restrictor LoadRestrictionsNone ${DIR_PATH}
+    if ! kustomize build --load-restrictor LoadRestrictionsNone ${DIR_PATH}; then
+        return 1
+    fi
 }
 
 function select_document {
@@ -74,8 +76,13 @@ function doc_count {
     yq e '. | kind' | wc -l
 }
 
+all_docs=$(build "${KUST_DIR}")
+if [ "$?" -ne 0 ]; then
+    echo "$0: kustomize build failed"
+    exit 1
+fi
 
-OUT=$(build "${KUST_DIR}" | select_document "$YQ_SELECT")
+OUT=$(echo "$all_docs" | select_document "$YQ_SELECT")
 
 if [[ $DOC_COUNT -eq 1 ]]; then
     echo "${OUT}" | doc_count
