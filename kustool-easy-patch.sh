@@ -43,13 +43,14 @@ function debug {
 RESOURCE_PARTS=""
 PATCHES_PARTS=""
 NONTARGET_PARTS=""
+TARGET_YAML="target: {}"
 while [[ $# -gt 0 ]]; do
   case $1 in
     -k|--kind)
-      KIND=$2
+      export KIND=$2
       RESOURCE_PARTS="$RESOURCE_PARTS .kind==\"${KIND}\""
       PATCHES_PARTS="$PATCHES_PARTS .target.kind==\"${KIND}\""
-      NONTARGET_PARTS="$NONTARGET_PARTS .target.name!=\"${KIND}\""
+      NONTARGET_PARTS="$NONTARGET_PARTS .target.kind!=\"${KIND}\""
       shift
       shift
       ;;
@@ -168,6 +169,15 @@ function write_unpatched_kustomize_file {
     pop_unpatched_kustomize "${kust_file}.bak"
 }
 
+function target_from_resource {
+    FILE="${1}"
+    kind=$(yq '.kind' "${FILE}")
+    name=$(yq '.metadata.name' "${FILE}")
+
+    debug "kind: $kind; name: $name"
+    echo "target: {\"kind\":\"${kind}\",\"name\":\"${name}\"}"
+}
+
 ### Validation
 if [ -z ${KUST_FILE} ]; then
     help "Path to kustomization.yaml not specified"
@@ -192,6 +202,7 @@ fi
 
 # Build and write current fully _patched_ yaml to EDIT_FILE
 write_edit_file "${KUST_FILE}" "${RESOURCE_SELECT}" ${EDIT_FILE}
+export BASE_TARGET=$(target_from_resource ${EDIT_FILE})
 write_unpatched_kustomize_file "${KUST_FILE}" "${RESOURCE_SELECT}" "${UNPATCHED_BUILD_FILE}"
 
 # edit EDIT_FILE
@@ -216,27 +227,23 @@ export PATCHES="$(jd -f patch -yaml ${UNPATCHED_BUILD_FILE} ${EDIT_FILE} | yq -P
 debug "Generated updated yamlfied JSON patch"
 debug "${PATCHES}"
 
-#TODO: insert (or replace) the single patch matching PATCHES_SELECT _using_ the .kind/.metadata.name from the yaml resource.
-
 debug "Filter select query for other patch targets: $NOMUTATE_SELECT"
 
-CURRENT_PATCH_TARGET=$(cat "${KUST_FILE}" | yq  '.patches | filter(eval(strenv(PATCHES_SELECT)))')
-debug "CURRENT_PATCH_TARGET\n${CURRENT_PATCH_TARGET}"
+# Grab the .target to update from the specified kustomize.yaml, then
+# set its .patch to the updated patch string.
+CURRENT_PATCHES_TARGET=$(cat "${KUST_FILE}" | yq '.patches | filter(eval(strenv(PATCHES_SELECT))) | .[0] *+ env(BASE_TARGET) | [.]' | yq -P)
+debug "CURRENT_PATCHES_TARGET\n${CURRENT_PATCHES_TARGET}"
 
-export NEW_PATCH_TARGET=$(echo "${CURRENT_PATCH_TARGET}" | yq  '.[0].patch |= strenv(PATCHES)')
+export NEW_PATCH_TARGET=$(echo "${CURRENT_PATCHES_TARGET}" | yq  '.[0].patch |= strenv(PATCHES)')
 debug "The patched patch target"
 debug "${NEW_PATCH_TARGET}"
-
-# # Remove the single patch target from the original, and append the new
-# debug "without function"
-# cat "${KUST_FILE}" | yq '.patches |= filter(eval(strenv(NOMUTATE_SELECT))) *+ env(NEW_PATCH_TARGET)'
 
 debug "Generating kustomization with updated patch target"
 debug "  would write to ${KUST_FILE}"
 NEW_KUSTOMIZATION=$(cat "${KUST_FILE}" | replace_patch_target "${NOMUTATE_SELECT}" "${NEW_PATCH_TARGET}")
 echo "${NEW_KUSTOMIZATION}"
 
-
+# Write to kustomization.yaml if flag is set
 if [ ! -z ${WRITE_KUSTOMIZATION_UPDATE} ]; then
     echo "${NEW_KUSTOMIZATION}" > "${KUST_FILE}"
     debug "Updated ${KUST_FILE}"
