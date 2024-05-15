@@ -215,6 +215,14 @@ write_edit_file "${KUST_FILE}" "${RESOURCE_SELECT}" ${EDIT_FILE}
 export BASE_TARGET=$(target_from_resource ${EDIT_FILE})
 write_unpatched_kustomize_file "${KUST_FILE}" "${RESOURCE_SELECT}" "${UNPATCHED_BUILD_FILE}"
 
+if [[ $(wc -l < ${EDIT_FILE}) -lt 2 ]]; then
+    build $(dirname "${KUST_FILE}") | yq -P
+
+    echo -e "\n\nError: No matches for {kind: $KIND, name: $NAME} found in kustomize build for:\n  ${KUST_FILE}"
+    echo -e "\nSee preview above for resources ready to patch."
+    exit 1
+fi
+
 # edit EDIT_FILE
 # TODO: why does quoting the tempfile not work?
 if [ ! -z $FILE_TO_DIFF ]; then

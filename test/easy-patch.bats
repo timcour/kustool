@@ -78,3 +78,11 @@ function pass {
 
     [ "$status" -eq 1 ]
 }
+
+@test "should fail with useful message when no patchable resources found" {
+    run $EASY_PATCH --kind Deployment --name does-not-exist \
+        --file-to-diff ${KUSTOOL_ROOT}/test/data/easy-patch-happy-path-edited.yaml \
+        test/cluster-a/web/kustomization.yaml
+
+    [ "$status" -eq 1 ]
+}
