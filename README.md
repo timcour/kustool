@@ -2,8 +2,9 @@
 
 [Kustomization GitHub](https://github.com/kubernetes-sigs/kustomize)
 
-## `kustool-easy-patch.sh` - Patch using interactive editor
-Generates yaml patches to be used in a `kustomization.yaml`.
+## `kustool-easy-patch.sh` - Interactive Kustomize patching
+Using your bash $EDITOR, edit the kustomize-built artifact directly to
+add or update your `.patches` in a `kustomization.yaml`.
 
 ```
  $ ./kustool-easy-patch.sh --help
