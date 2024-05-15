@@ -5,7 +5,7 @@
 ## `kustool-easy-patch.sh` - Patch using interactive editor
 Generates yaml patches to be used in a `kustomization.yaml`.
 
-``` shell
+```
  $ ./kustool-easy-patch.sh --help
 Usage: ./kustool-easy-patch.sh <kustomization-path> [flags...]
 
@@ -24,4 +24,23 @@ Flags:
 Example:
   Auto-update (or add) a patch to Deployment named 'app-name'
     ./kustool-easy-patch.sh --kind Deployment --name app-name /path/to/kustomization.yaml
+```
+
+## Development
+### Dependencies
+
+- [jd](https://github.com/josephburnett/jd) - JSON Diff
+- [yq](https://github.com/mikefarah/yq) - YAML Parsing
+- [bats-core](https://github.com/bats-core/bats-core) - Unit tests
+
+With homebrew:
+
+``` shell
+brew bundle
+```
+
+### Running Tests
+
+``` shell
+make test
 ```
