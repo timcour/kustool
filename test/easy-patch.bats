@@ -20,8 +20,6 @@ function pass {
 }
 
 @test "adds target kind/name when adding a new patch" {
-    skip "not yet supported"
-
     result=$($EASY_PATCH --kind Deployment --name nginx-deployment \
                          --debug --file-to-diff ${KUSTOOL_ROOT}/test/data/easy-patch-new-target-edited.yaml \
                          test/cluster-a/web/nginx/kustomization.yaml | yq)
