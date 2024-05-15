@@ -60,6 +60,13 @@ function pass {
     skip "not yet tested"
 }
 
+@test "should fail if /path/to/kustomization not specified" {
+    run $EASY_PATCH --kind Deployment --name nginx-deployment --debug \
+                --file-to-diff ${KUSTOOL_ROOT}/test/data/easy-patch-happy-path-edited.yaml
+
+    [ "$status" -eq 1 ]
+}
+
 @test "should always print the final (and only the final) kustomize.yaml to stdout" {
     result=$($EASY_PATCH --kind Deployment --name nginx-deployment \
                          --file-to-diff ${KUSTOOL_ROOT}/test/data/easy-patch-happy-path-edited.yaml \
