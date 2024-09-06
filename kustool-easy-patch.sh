@@ -259,7 +259,7 @@ debug "${NEW_PATCH_TARGET}"
 debug "Generating kustomization with updated patch target"
 debug "  would write to ${KUST_FILE}"
 NEW_KUSTOMIZATION=$(cat "${KUST_FILE}" | replace_patch_target "${NOMUTATE_SELECT}" "${NEW_PATCH_TARGET}")
-echo "${NEW_KUSTOMIZATION}"
+echo "${NEW_KUSTOMIZATION}" | yq -P
 
 # Write to kustomization.yaml if flag is set
 if [ ! -z ${WRITE_KUSTOMIZATION_UPDATE} ]; then
